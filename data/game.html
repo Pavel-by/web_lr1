@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" type="text/css" href="styles.css"/>
+    <script type="text/javascript">
+        const FIGURE_MAX_SIZE = 4;
+        const figures = [
+            [[0, 0], [0, 1], [0, 2], [0, 3]],
+            [[0, 0], [0, 1], [1, 1], [2, 1]],
+            [[1, 0], [1, 1], [0, 1], [0, 2]],
+            [[0, 0], [0, 1], [1, 1], [2, 1]],
+            [[0, 1], [1, 1], [2, 1], [2, 0]],
+            [[1, 0], [0, 1], [1, 1], [2, 1]],
+            [[0, 0], [0, 1], [1, 0], [1, 1]]
+        ].map(arr => {
+            return arr.map(cell => {
+                return {x: cell[0], y: cell[1]};
+            });
+        });
+        const INTERVAL = 1000;
+        const SHORT_INTERVAL = 200;
+        const styles = [
+            "#CD5C5C",
+            "#FF0000",
+            "#32CD32",
+            "#00CED1",
+            "#0000FF",
+            "#D2691E"
+        ];
+
+        const nick = localStorage["nick"];
+
+        if (!nick)
+            document.location.replace("/");
+        else
+            document.addEventListener("DOMContentLoaded", () => {
+                init();
+            });
+
+        function init() {
+            const conf = Object();
+
+            conf.filledCells = [];
+            conf.cellsCount = {x: 10, y: 20};
+
+            let gameCanvas = document.getElementById("game");
+            conf.gameContext = gameCanvas.getContext("2d");
+
+            let nextFigureCanvas = document.getElementById("next-figure");
+            conf.nextFigureContext = nextFigureCanvas.getContext("2d");
+
+            conf.nickField = document.getElementById("nick");
+            conf.scoreField = document.getElementById("score");
+            conf.score = 0;
+
+            transformCanvas(conf.gameContext, conf.cellsCount);
+            transformCanvas(conf.nextFigureContext, {x: FIGURE_MAX_SIZE, y: FIGURE_MAX_SIZE});
+
+            window.addEventListener("resize", () => {
+                transformCanvas(conf.gameContext, conf.cellsCount);
+                transformCanvas(conf.nextFigureContext, {x: FIGURE_MAX_SIZE, y: FIGURE_MAX_SIZE});
+                drawAll(conf);
+            });
+
+            window.addEventListener("keydown", event => {
+                if (event.key === "Enter") {
+                    // down
+                    applyFigure(conf);
+                    refreshFigure(conf);
+                    drawAll(conf);
+                    return;
+                }
+
+                if (event.key === " ") {
+                    let figure = rotateFigure(conf.current);
+                    if (canPlace(conf, figure, conf.currentOffset)) {
+                        conf.current = figure;
+                        drawGame(conf);
+                    }
+                    return;
+                }
+
+                if (event.key === "ArrowDown") {
+                    refreshInterval(conf, SHORT_INTERVAL, true);
+                }
+
+                let newOffset = {x: conf.currentOffset.x, y: conf.currentOffset.y};
+
+                if (event.key === "ArrowRight") {
+                    // right
+                    newOffset.x++;
+                } else if (event.key === "ArrowLeft") {
+                    // left
+                    newOffset.x--;
+                }
+
+                if ((conf.currentOffset.x !== newOffset.x)
+                    && canPlace(conf, conf.current, newOffset)) {
+                    conf.currentOffset = newOffset;
+                    drawGame(conf);
+                }
+            });
+            window.addEventListener("keyup", event => {
+                if (event.key === "ArrowDown") {
+                    refreshInterval(conf, INTERVAL);
+                }
+            });
+
+            refreshFigure(conf);
+
+            drawAll(conf);
+        }
+
+        function figureSize(figure) {
+            let size = {x: 0, y: 0};
+
+            figure.forEach((cell) => {
+                size.x = Math.max(size.x, cell.x + 1);
+                size.y = Math.max(size.y, cell.y + 1);
+            });
+
+            return size;
+        }
+
+        function rotateFigure(figure) {
+            let size = figureSize(figure);
+            return figure.map(cell => {
+                return {x: size.y - cell.y - 1, y: cell.x};
+            });
+        }
+
+        function canPlace(conf, figure, offset) {
+            var ok = true;
+            figure.forEach(cell => {
+                let point = {x: cell.x + offset.x, y: cell.y + offset.y};
+
+                conf.filledCells.forEach(filledCell => {
+                    if (filledCell.x == point.x && filledCell.y == point.y)
+                        ok = false;
+                });
+
+                if (point.x < 0 || point.x >= conf.cellsCount.x)
+                    ok = false;
+
+                if (point.y < 0 || point.y >= conf.cellsCount.y)
+                    ok = false;
+            });
+
+            if (!ok)
+                return false;
+
+            if (offset.x >= conf.cellsCount.x || offset.y >= conf.cellsCount.y)
+                return false;
+
+            return true;
+        }
+
+        function removeLines(conf) {
+            let arr = Array(conf.cellsCount.y).fill(0);
+
+            conf.filledCells.forEach(cell => {
+                arr[cell.y]++;
+            });
+
+            let yOffset = 0;
+
+            for (let key = conf.cellsCount.y - 1; key >= 0; key--) {
+                if (arr[key] === conf.cellsCount.x) {
+                    conf.score++;
+                    arr[key] = -1;
+                    yOffset++;
+                } else {
+                    arr[key] = yOffset;
+                }
+            }
+
+            conf.filledCells = conf.filledCells.filter((cell, index, all) => {
+                return arr[cell.y] !== -1;
+            }).map((cell, index, all) => {
+                cell.y += arr[cell.y];
+                return cell;
+            });
+        }
+
+        function refreshFigure(conf) {
+            if (conf.nextFigure)
+                conf.current = conf.nextFigure;
+            else
+                conf.current = generateFigure();
+
+            if (conf.nextStyle)
+                conf.currentStyle = conf.nextStyle;
+            else
+                conf.currentStyle = generateStyle();
+
+            conf.nextFigure = generateFigure();
+            conf.nextStyle = generateStyle();
+
+            conf.currentOffset = {
+                x: Math.floor((conf.cellsCount.x - figureSize(conf.current).x) / 2),
+                y: 0
+            };
+
+            if (conf.intervalId) {
+                clearInterval(conf.intervalId);
+                conf.intervalId = undefined;
+            }
+
+            if (!canPlace(conf, conf.current, conf.currentOffset)) {
+                alert("Вы проиграли! Ваш счет " + conf.score);
+
+                let records = {};
+                if (localStorage.records !== undefined)
+                    try {
+                        records = JSON.parse(localStorage.records);
+                    } catch (e) {
+                        console.log("Failed to parse records table. Create new");
+                    }
+
+                if (!records[nick] || records[nick].score < conf.score) {
+                    records[nick] = {
+                        nick: nick,
+                        score: conf.score,
+                    };
+                    localStorage.records = JSON.stringify(records);
+                }
+
+                console.log(JSON.stringify(records));
+
+                window.location = "/records.html";
+                return;
+            }
+
+            refreshInterval(conf, INTERVAL);
+        }
+
+        function refreshInterval(conf, interval, callImmediately) {
+            if (conf.intervalId && conf.interval === interval)
+                return;
+
+            if (conf.intervalId) {
+                clearInterval(conf.intervalId);
+                conf.intervalId = undefined;
+            }
+
+            let listener = () => {
+                let offset = {x: conf.currentOffset.x, y: conf.currentOffset.y + 1};
+                if (canPlace(conf, conf.current, offset)) {
+                    conf.currentOffset = offset;
+                    drawGame(conf);
+                } else {
+                    applyFigure(conf);
+                    refreshFigure(conf);
+                    drawAll(conf);
+                }
+            };
+
+            conf.interval = interval / Math.max(Math.log(conf.score), 1);
+            conf.intervalId = setInterval(listener, conf.interval);
+
+            if (callImmediately)
+                listener();
+        }
+
+        function applyFigure(conf) {
+            let offset = conf.currentOffset;
+
+            while (canPlace(conf, conf.current, offset))
+                offset.y++;
+
+            offset.y--;
+
+            conf.current.forEach((cell, index, all) => {
+                conf.filledCells.push({
+                    x: cell.x + conf.currentOffset.x,
+                    y: cell.y + conf.currentOffset.y,
+                    style: conf.currentStyle,
+                });
+
+            });
+
+            removeLines(conf);
+        }
+
+        function transformCanvas(context, size) {
+            let requiredRatio = size.x / size.y;
+            let realWidth = context.canvas.clientWidth;
+            let realHeight = context.canvas.clientHeight;
+            let realRatio = realWidth / realHeight;
+
+            context.canvas.width = realWidth;
+            context.canvas.height = realHeight;
+
+            if (realRatio > requiredRatio) {
+                // need decrease width
+                let scale = realHeight / size.y;
+                context.setTransform(
+                    scale,
+                    0,
+                    0,
+                    scale,
+                    (realWidth - realHeight * requiredRatio) / 2,
+                    0
+                );
+            } else {
+                let scale = realWidth / size.x;
+                context.setTransform(
+                    scale,
+                    0,
+                    0,
+                    scale,
+                    0,
+                    0,
+                );
+            }
+        }
+
+        function drawAll(conf) {
+            drawGame(conf);
+            drawNextFigure(conf);
+            conf.nickField.innerHTML = nick;
+            conf.scoreField.innerHTML = conf.score.toString();
+
+            console.log(conf);
+        }
+
+        function drawGame(conf) {
+            let context = conf.gameContext;
+            context.clearRect(0, 0, 100, 100);
+            context.fillStyle = "#eeeeee";
+            context.fillRect(0, 0, conf.cellsCount.x, conf.cellsCount.y);
+
+            drawFigure(context, conf.filledCells);
+            drawFigure(context, conf.current, conf.currentOffset, conf.currentStyle);
+        }
+
+        function drawNextFigure(conf) {
+            conf.nextFigureContext.clearRect(0, 0, 100, 100);
+            drawFigure(conf.nextFigureContext, conf.nextFigure, {x: 0, y: 0}, conf.nextStyle);
+        }
+
+        function drawFigure(context, figure, offset, style) {
+            if (!style) style = "black";
+            if (!offset) offset = {x: 0, y: 0};
+
+            figure.forEach((cell, index, all) => {
+                if (cell.style)
+                    context.fillStyle = cell.style;
+                else
+                    context.fillStyle = style;
+
+                let x = offset.x + cell.x;
+                let y = offset.y + cell.y;
+                context.fillRect(x, y, 1, 1);
+            });
+        }
+
+        function generateFigure() {
+            return figures[Math.floor(Math.random() * figures.length)];
+        }
+
+        function generateStyle() {
+            return styles[Math.floor(Math.random() * styles.length)];
+        }
+    </script>
+</head>
+<body>
+<div class="root">
+    <div class="limit">
+        <div style="display: flex; flex-direction: row; flex-wrap: nowrap;">
+            <div style="flex: 1; display: inline-block; max-height: 80vh; overflow: auto;">
+                <h1>Тетрис</h1>
+                <div>
+                    <p>Имя: <b id="nick"></b></p>
+                    <p>Счет: <b id="score"></b></p>
+                    <p>Следующая фигура</p>
+                    <canvas width="100" height="100" id="next-figure"></canvas>
+                    <p>Управление:</p>
+                    <p>Стрелки вправо-влево - перемещение фигуры вправо-влево соответственно.</p>
+                    <p>Enter - опустить фигуру.</p>
+                    <p>Пробел - повернуть фигуру.</p>
+                    <p>Стрелка вниз - ускорить фигуру.</p>
+                    <hr/>
+                    <div>
+                        <p>
+                            <a href="login.html">Сменить пользователя</a>
+                            | <a href="game.html">Играть</a>
+                            | <a href="records.html">Таблица рекордов</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div style="width: 20px"></div>
+            <canvas style="flex: 1; height: 700px; max-height: 80vh;" id="game"></canvas>
+        </div>
+    </div>
+</div>
+</body>
+</html>

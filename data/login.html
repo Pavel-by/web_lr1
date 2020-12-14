@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Log in</title>
+    <link rel="stylesheet" type="text/css" href="styles.css"/>
+    <script type="text/javascript">
+        function login() {
+            let value = document.getElementById("nick").value;
+
+            if (!value) {
+                alert("Ник не может быть пустым!");
+                return;
+            }
+
+            localStorage["nick"] = value;
+            window.location.replace("game.html");
+        }
+
+        document.addEventListener("DOMContentLoaded",() => {
+            if (localStorage["nick"])
+                document.getElementById("nick").value = localStorage["nick"];
+        });
+    </script>
+<body>
+<div class="root">
+    <div class="limit">
+        <div style="text-align: center;">
+            <form style="display: inline-block;" onsubmit="login(); return false;">
+                <h2>Введите логин</h2>
+                <input type="text" id="nick"/>
+                <input type="submit" value="Войти"/>
+            </form>
+        </div>
+        <br>
+        <hr/>
+        <div>
+            <p>
+                <a href="login.html">Сменить пользователя</a>
+                | <a href="game.html">Играть</a>
+                | <a href="records.html">Таблица рекордов</a>
+            </p>
+        </div>
+    </div>
+</div>
+</body>
+</html>

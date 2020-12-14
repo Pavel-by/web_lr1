@@ -1,0 +1,10 @@
+.root {
+    padding: 20px;
+}
+
+.limit {
+    alignment: center;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+

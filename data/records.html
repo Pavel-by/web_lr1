@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Records</title>
+    <link rel="stylesheet" type="text/css" href="styles.css"/>
+    <script type="text/javascript">
+        document.addEventListener("DOMContentLoaded", () => {
+            let records = {};
+            if (localStorage.records)
+                try {
+                    records = Object.values(JSON.parse(localStorage.records)).sort((a, b) => {
+                        return b.score - a.score;
+                    });
+                } catch (e) {
+                    console.log("Что-то не так с таблицей рекордов");
+                }
+
+            console.log(records);
+            if (records.length > 0) {
+                let index = 1;
+                document.getElementById("records").innerHTML = records.map((record) => {
+                    return `<p>${index++}. ${record.nick}: <b>${record.score}</b>`;
+                }).join();
+            }
+            else
+                document.getElementById("records").innerHTML =
+                    "<p>Нет результатов :(<br><a href='login.html'>п(р)оиграйте!</a></p>"
+        });
+    </script>
+</head>
+<body>
+<div class="root">
+    <div class="limit">
+        <h1>Таблица рекордов</h1>
+        <div id="records"></div>
+        <hr/>
+        <div>
+            <p>
+                <a href="login.html">Сменить пользователя</a>
+                | <a href="game.html">Играть</a>
+                | <a href="records.html">Таблица рекордов</a>
+            </p>
+        </div>
+    </div>
+</div>
+</body>
+</html>
